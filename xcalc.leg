@@ -1,0 +1,104 @@
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <limits.h>
+
+#define YYSTYPE long long
+#define YYSTYPE_BITS (sizeof(YYSTYPE) * CHAR_BIT)
+#define YY_INPUT(buf, result, max_size)			\
+	{						\
+	result = !*instr ? 0 : (*(buf) = *instr++, 1);		\
+	}
+
+static const char *instr;
+static YYSTYPE result;
+static int error_flag;
+
+static YYSTYPE ipow(YYSTYPE g, YYSTYPE k)
+{
+        YYSTYPE r0, r1;
+        unsigned j = sizeof(k) * CHAR_BIT;
+        r0 = 1;
+        r1 = g;
+        while (j--) {
+                if ((k >> j) & 1) {
+                        r0 = r0 * r1;
+                        r1 = r1 * r1;
+                } else {
+                        r1 = r0 * r1;
+                        r0 = r0 * r0;
+                }
+        }
+        return r0;
+}
+
+static void pr(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+}
+
+%}
+
+stmt = WS i:expr EOF			{ result = i; }
+	| .				{ error_flag = 1; }
+expr = l:term0
+	( '&' WS r:term0		{ l &= r; }
+	| '|' WS r:term0		{ l |= r; }
+	| '^' WS r:term0		{ l ^= r; }
+	)*				{ $$ = l; }
+term0 = l:term1
+	( '<' WS r:term1		{ l = l < r; }
+	| '>' WS r:term1		{ l = l > r; }
+	| '>=' WS r:term1		{ l = l >= r; }
+	| '<=' WS r:term1		{ l = l <= r; }
+	| '==' WS r:term1		{ l = l == r; }
+	| '!=' WS r:term1		{ l = l != r; }
+	)*				{ $$ = l; }
+term1 = l:term2
+	( '<<' WS r:term2		{ l <<= r; }
+	| '>>' WS r:term2		{ l >>= r; }
+	| '>>>' WS r:term2		{ l = (l >> r) | (l << (YYSTYPE_BITS - r)); }
+	| '<<<' WS r:term2		{ l = (l << r) | (l >> (YYSTYPE_BITS - r)); }
+	)*				{ $$ = l; }
+term2 = l:term3
+	( '+' WS r:term3		{ l += r; }
+	| '-' WS r:term3		{ l -= r; }
+	)*				{ $$ = l; }
+term3 = l:term4
+	( '*' WS r:term4		{ l *= r; }
+	| '/' WS r:term4		{ l /= r; }
+	| '%' WS r:term4		{ l /= r; }
+	)*				{ $$ = l; }
+term4 = l:term5
+	( '**' WS r:term5		{ l = ipow(l, r); }
+	)*				{ $$ = l; }
+term5 = l:factor			{ $$ = l; }
+	| '~' WS l:factor		{ $$ = ~l; }
+factor = ( i:NUM
+	| '(' WS i:expr ')' WS
+	)				{ $$ = i; }
+
+NUM =
+	( '0x' < [0-9a-fA-F]+ > WS		{ $$ = strtoll(yytext, 0, 16); }
+	| '0b' < [0-9a-fA-F]+ > WS		{ $$ = strtoll(yytext, 0, 2); }
+	| '0' < [0-9a-fA-F]+ > WS		{ $$ = strtoll(yytext, 0, 8); }
+	| < ('+' | '-')? [0-9]+ > WS		{ $$ = atoll(yytext); }
+	)
+WS = [ \t\r\n]*
+EOF = !.
+
+%%
+int xcalc(const char *s, YYSTYPE *v)
+{
+	error_flag = 0;
+	instr = s;
+	result = 0xdeadbeef;
+	while (yyparse()) ;
+	*v = result;
+	pr("error=%d\n", error_flag);
+	return error_flag;
+}
