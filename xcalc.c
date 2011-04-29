@@ -39,14 +39,6 @@ static YYSTYPE ipow(YYSTYPE g, YYSTYPE k)
         return r0;
 }
 
-static void pr(const char *fmt, ...)
-{
-	va_list ap;
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
-
 
 #ifndef YY_VARIABLE
 #define YY_VARIABLE(T)	static T
@@ -815,7 +807,6 @@ int xcalc(const char *s, YYSTYPE *v)
 	result = 0xdeadbeef;
 	while (yyparse()) ;
 	*v = result;
-	pr("error=%d\n", error_flag);
 	return error_flag;
 }
 
