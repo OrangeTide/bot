@@ -48,6 +48,7 @@ static char inbuf[1024];
 static size_t inbuf_ofs;
 static size_t inbuf_max = sizeof(inbuf);
 static sig_atomic_t keep_going;
+static time_t start_time;
 
 static int bot_option(const char *name, const char *value)
 {
@@ -293,7 +294,7 @@ static int on_user_help(int fd, _unused const char *from, const char *to,
 	_unused char *msg)
 {
 	return irc_notice(fd, to,
-		"HELP: quit, echo, calc, hexcalc, time, help");
+		"HELP: quit, echo, calc, hexcalc, time, uptime, help");
 }
 
 static int on_user_time(int fd, _unused const char *from, const char *to,
@@ -306,6 +307,16 @@ static int on_user_time(int fd, _unused const char *from, const char *to,
 	gmtime_r(&t, &tm);
 	strftime(buf, sizeof buf, "%a, %d %b %Y %H:%M:%S +0000", &tm);
 	return irc_notice(fd, to, "the time is %s", buf);
+}
+
+static int on_user_uptime(int fd, _unused const char *from, const char *to,
+	_unused char *msg)
+{
+	time_t now;
+	double uptime;
+	time(&now);
+	uptime = difftime(now, start_time);
+	return irc_notice(fd, to, "I've been awake for %g seconds.", uptime);
 }
 
 static int dispatch_user_command(int fd, const char *from, const char *to,
@@ -322,6 +333,7 @@ static int dispatch_user_command(int fd, const char *from, const char *to,
 		{ "hexcalc", on_user_hexcalc },
 		{ "help", on_user_help },
 		{ "time", on_user_time },
+		{ "uptime", on_user_uptime },
 	};
 	unsigned i;
 
@@ -533,6 +545,8 @@ static int bot_start(void)
 		pr_err("unable to connect!\n");
 		return ret;
 	}
+
+	time(&start_time);
 
 	irc_user(fd, opt.host, opt.nick);
 
