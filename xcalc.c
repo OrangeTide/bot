@@ -613,7 +613,7 @@ YY_RULE(int) yy_term4()
 {  int yypos0= yypos, yythunkpos0= yythunkpos;  yyDo(yyPush, 2, 0);
   yyprintf((stderr, "%s\n", "term4"));  if (!yy_term5()) goto l24;  yyDo(yySet, -2, 0);
   l25:;	
-  {  int yypos26= yypos, yythunkpos26= yythunkpos;  if (!yymatchString("**")) goto l26;  if (!yy_WS()) goto l26;  if (!yy_term5()) goto l26;  yyDo(yySet, -1, 0);  yyDo(yy_1_term4, yybegin, yyend);  goto l25;
+  {  int yypos26= yypos, yythunkpos26= yythunkpos;  if (!yymatchString("**")) goto l26;  if (!yy_WS()) goto l26;  if (!yy_term4()) goto l26;  yyDo(yySet, -1, 0);  yyDo(yy_1_term4, yybegin, yyend);  goto l25;
   l26:;	  yypos= yypos26; yythunkpos= yythunkpos26;
   }  yyDo(yy_2_term4, yybegin, yyend);
   yyprintf((stderr, "  ok   %s @ %s\n", "term4", yybuf+yypos));  yyDo(yyPop, 2, 0);
