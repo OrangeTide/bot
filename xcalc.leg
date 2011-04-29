@@ -62,8 +62,8 @@ term2 = l:term3
 	)*				{ $$ = l; }
 term3 = l:term4
 	( '*' WS r:term4		{ l *= r; }
-	| '/' WS r:term4		{ l /= r; }
-	| '%' WS r:term4		{ l /= r; }
+	| '/' WS r:term4		{ if (r) l /= r; else error_flag = 1; }
+	| '%' WS r:term4		{ if (r) l /= r; else error_flag = 1; }
 	)*				{ $$ = l; }
 term4 = l:term5
 	( '**' WS r:term5		{ l = ipow(l, r); }

@@ -336,7 +336,7 @@ YY_ACTION(void) yy_3_term3(char *yytext, int yyleng)
 #define r yyval[-1]
 #define l yyval[-2]
   yyprintf((stderr, "do yy_3_term3\n"));
-   l /= r; ;
+   if (r) l /= r; else error_flag = 1; ;
 #undef r
 #undef l
 }
@@ -345,7 +345,7 @@ YY_ACTION(void) yy_2_term3(char *yytext, int yyleng)
 #define r yyval[-1]
 #define l yyval[-2]
   yyprintf((stderr, "do yy_2_term3\n"));
-   l /= r; ;
+   if (r) l /= r; else error_flag = 1; ;
 #undef r
 #undef l
 }
