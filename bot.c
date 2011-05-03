@@ -314,9 +314,27 @@ static int on_user_uptime(int fd, _unused const char *from, const char *to,
 {
 	time_t now;
 	double uptime;
+	unsigned days, hours, min, sec;
+	div_t r;
 	time(&now);
 	uptime = difftime(now, start_time);
-	return irc_notice(fd, to, "I've been awake for %g seconds.", uptime);
+	r = div(uptime, 86400);
+	days = r.quot;
+	hours = r.rem / 3600;
+	r.rem %= 3600;
+	min = r.rem / 60;
+	sec = r.rem % 60;
+	if (days)
+		return irc_notice(fd, to, "I've been awake for %u days, %u hours, %u minutes and %u seconds.",
+			days, hours, min, sec);
+	else if (hours)
+		return irc_notice(fd, to, "I've been awake for %u hours, %u minutes and %u seconds.",
+			hours, min, sec);
+	else if (min)
+		return irc_notice(fd, to, "I've been awake for %u minutes and %u seconds.",
+			min, sec);
+	else
+		return irc_notice(fd, to, "I've been awake for %u seconds.", sec);
 }
 
 static int dispatch_user_command(int fd, const char *from, const char *to,
