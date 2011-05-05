@@ -18,7 +18,6 @@
 	}
 
 static const char *instr;
-static YYSTYPE result;
 static int error_flag;
 
 static YYSTYPE ipow(YYSTYPE g, YYSTYPE k)
@@ -540,7 +539,7 @@ YY_ACTION(void) yy_1_stmt(char *yytext, int yyleng)
 {
 #define i yyval[-1]
   yyprintf((stderr, "do yy_1_stmt\n"));
-   result = i; ;
+   yy = i; ;
 #undef i
 }
 
@@ -804,9 +803,8 @@ int xcalc(const char *s, YYSTYPE *v)
 {
 	error_flag = 0;
 	instr = s;
-	result = 0xdeadbeef;
 	while (yyparse()) ;
-	*v = result;
+	*v = yy;
 	return error_flag;
 }
 

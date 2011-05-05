@@ -12,7 +12,6 @@
 	}
 
 static const char *instr;
-static YYSTYPE result;
 static int error_flag;
 
 static YYSTYPE ipow(YYSTYPE g, YYSTYPE k)
@@ -35,7 +34,7 @@ static YYSTYPE ipow(YYSTYPE g, YYSTYPE k)
 
 %}
 
-stmt = WS i:expr EOF			{ result = i; }
+stmt = WS i:expr EOF			{ $$ = i; }
 	| .				{ error_flag = 1; }
 expr = l:term0
 	( '&' WS r:term0		{ l &= r; }
@@ -88,8 +87,7 @@ int xcalc(const char *s, YYSTYPE *v)
 {
 	error_flag = 0;
 	instr = s;
-	result = 0xdeadbeef;
 	while (yyparse()) ;
-	*v = result;
+	*v = yy;
 	return error_flag;
 }
