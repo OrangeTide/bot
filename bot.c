@@ -266,28 +266,38 @@ static int on_user_calc(int fd, const char *from, const char *to,
 	char *msg)
 {
 	const char *nick = get_nick(from); // WARNING: called twice
-	long long v;
+	int ret;
+	struct num *num;
+
 	if (!msg)
 		return irc_notice(fd, to, "calc error");
 
-	if (xcalc(msg, &v))
+	num = xcalc(msg);
+	if (!num)
 		return irc_notice(fd, to, "%s's result is an error!", nick);
-	else
-		return irc_notice(fd, to, "%s's result is %lld", nick, v);
+
+	ret = irc_notice(fd, to, "%s's result is %s", nick, num_string(num));
+	num_free(num);
+	return ret;
 }
 
 static int on_user_hexcalc(int fd, const char *from, const char *to,
 	char *msg)
 {
 	const char *nick = get_nick(from); // WARNING: called twice
-	long long v;
+	int ret;
+	struct num *num;
+
 	if (!msg)
 		return irc_notice(fd, to, "calc error");
 
-	if (xcalc(msg, &v))
+	num = xcalc(msg);
+	if (!num)
 		return irc_notice(fd, to, "%s's result is an error!", nick);
-	else
-		return irc_notice(fd, to, "%s's result is %#llx", nick, v);
+
+	ret = irc_notice(fd, to, "%s's result is %s", nick, num_hexstring(num));
+	num_free(num);
+	return ret;
 }
 
 static int on_user_help(int fd, _unused const char *from, const char *to,

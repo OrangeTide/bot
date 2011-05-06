@@ -3,20 +3,37 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <limits.h>
+#include <math.h>
+#include <complex.h>
+#include "xcalc.h"
 
-#define YYSTYPE long long
-#define YYSTYPE_BITS (sizeof(YYSTYPE) * CHAR_BIT)
+#define YYSTYPE struct num*
 #define YY_INPUT(buf, result, max_size)			\
 	{						\
 	result = !*instr ? 0 : (*(buf) = *instr++, 1);		\
 	}
 
+#define INTEGER_BITS (int)(sizeof(YYSTYPE) * CHAR_BIT)
+
+enum num_type {
+	T_COMPLEX,
+	T_INTEGER,
+};
+
+struct num {
+	enum num_type type;
+	union {
+		long long i;
+		double complex c;
+	} data;
+};
+
 static const char *instr;
 static int error_flag;
 
-static YYSTYPE ipow(YYSTYPE g, YYSTYPE k)
+static long long ipow(long long g, unsigned k)
 {
-        YYSTYPE r0, r1;
+        unsigned long long r0, r1;
         unsigned j = sizeof(k) * CHAR_BIT;
         r0 = 1;
         r1 = g;
@@ -32,62 +49,445 @@ static YYSTYPE ipow(YYSTYPE g, YYSTYPE k)
         return r0;
 }
 
+static inline void num_set_integer(struct num *num, long long i)
+{
+	num->type = T_INTEGER;
+	num->data.i = i;
+}
+
+static inline void num_set_complex(struct num *num, double complex c)
+{
+	num->type = T_COMPLEX;
+	num->data.c = c;
+}
+
+static struct num *num_integer(long long i)
+{
+	struct num *ret;
+	ret = calloc(1, sizeof(*ret));
+	num_set_integer(ret, i);
+	return ret;
+}
+
+static struct num *num_complex(double complex c)
+{
+	struct num *ret;
+	ret = calloc(1, sizeof(*ret));
+	num_set_complex(ret, c);
+	return ret;
+}
+
+void num_free(struct num *num)
+{
+	if (num) {
+		num->type = -1;
+		num->data.i = 0x76543210deadbeefll;
+		free(num);
+	}
+}
+
+const char *num_string(const struct num *num)
+{
+	static char buf[64];
+	if (num)
+		switch (num->type) {
+		case T_COMPLEX: {
+			double i = cimag(num->data.c);
+			if (i)
+				snprintf(buf, sizeof(buf), "%.10g + %.10g * i",
+					creal(num->data.c), i);
+			else
+				snprintf(buf, sizeof(buf), "%.10g",
+					creal(num->data.c));
+			break;
+		}
+		case T_INTEGER:
+			snprintf(buf, sizeof(buf), "%llu", num->data.i);
+			break;
+		}
+	else
+		snprintf(buf, sizeof(buf), "<NIL>");
+	return buf;
+}
+
+const char *num_hexstring(const struct num *num)
+{
+	static char buf[64];
+	if (num)
+		switch (num->type) {
+		case T_COMPLEX: {
+			double i = cimag(num->data.c);
+			if (i)
+				snprintf(buf, sizeof(buf), "%.10a + %.10a * i\n",
+					creal(num->data.c), i);
+			else
+				snprintf(buf, sizeof(buf), "%.10a",
+					creal(num->data.c));
+			break;
+		}
+		case T_INTEGER:
+			snprintf(buf, sizeof(buf), "%#llx", num->data.i);
+			break;
+		}
+	else
+		snprintf(buf, sizeof(buf), "<NIL>");
+	return buf;
+}
+
+static void num_make_complex(struct num *num)
+{
+	switch (num->type) {
+	case T_COMPLEX:
+		break;
+	case T_INTEGER:
+		num->data.c = num->data.i;
+		num->type = T_COMPLEX;
+		break;
+	}
+}
+
+/* make a and b the same type */
+static void num_check(struct num *a, struct num *b)
+{
+	if (a->type != b->type) {
+		num_make_complex(a);
+		num_make_complex(b);
+	}
+}
+
+/* does: a += b; free(b); */
+static struct num *num_add(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		a->data.c += b->data.c;
+		break;
+	case T_INTEGER:
+		a->data.i += b->data.i;
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_neg(struct num *num)
+{
+	switch (num->type) {
+	case T_COMPLEX:
+		num->data.c = -num->data.c;
+		break;
+	case T_INTEGER:
+		num->data.i = -num->data.i;
+		break;
+	}
+	return num;
+}
+
+static inline struct num *num_sub(struct num *a, struct num *b)
+{
+	return num_add(a, num_neg(b));
+}
+
+static struct num *num_pow(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		a->data.c = cpow(a->data.c, b->data.c);
+		break;
+	case T_INTEGER:
+		a->data.i = ipow(a->data.i, b->data.i);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_mul(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		a->data.c *= b->data.c;
+		break;
+	case T_INTEGER:
+		a->data.i *= b->data.i;
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_div(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		a->data.c /= b->data.c;
+		break;
+	case T_INTEGER:
+		if (b->data.c)
+			a->data.i /= b->data.i;
+		else
+			num_set_complex(a, NAN);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_mod(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		a->data.c = fmod(creal(a->data.c), creal(b->data.c));
+		break;
+	case T_INTEGER:
+		if (b->data.c)
+			a->data.i /= b->data.i;
+		else
+			num_set_complex(a, NAN);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_and(struct num *a, struct num *b)
+{
+	if (a->type == T_COMPLEX)
+		num_set_integer(a, (long long)creal(a->data.c));
+	if (b->type == T_COMPLEX)
+		num_set_integer(b, (long long)creal(b->data.c));
+	a->data.i &= b->data.i;
+	num_free(b);
+	return a;
+}
+
+static struct num *num_or(struct num *a, struct num *b)
+{
+	if (a->type == T_COMPLEX)
+		num_set_integer(a, (long long)creal(a->data.c));
+	if (b->type == T_COMPLEX)
+		num_set_integer(b, (long long)creal(b->data.c));
+	a->data.i |= b->data.i;
+	num_free(b);
+	return a;
+}
+
+static struct num *num_xor(struct num *a, struct num *b)
+{
+	if (a->type == T_COMPLEX)
+		num_set_integer(a, (long long)creal(a->data.c));
+	if (b->type == T_COMPLEX)
+		num_set_integer(b, (long long)creal(b->data.c));
+	a->data.i ^= b->data.i;
+	num_free(b);
+	return a;
+}
+
+static struct num *num_not(struct num *a)
+{
+	if (a->type == T_COMPLEX)
+		num_set_integer(a, (long long)creal(a->data.c));
+	a->data.i = ~a->data.i;
+	return a;
+}
+
+static struct num *num_shl(struct num *a, struct num *b)
+{
+	if (b->type == T_COMPLEX)
+		num_set_integer(b, (long long)creal(b->data.c));
+	switch (a->type) {
+	case T_COMPLEX:
+		a->data.c = cpow(a->data.c, b->data.i);
+		break;
+	case T_INTEGER:
+		if (b->data.i < 0 && -b->data.i < INTEGER_BITS)
+			a->data.i >>= -b->data.i;
+		else if (b->data.i >= 0 && b->data.i < INTEGER_BITS)
+			a->data.i <<= b->data.i;
+		else
+			a->data.i = 0;
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static inline struct num *num_shr(struct num *a, struct num *b)
+{
+	return num_shl(a, num_neg(b));
+}
+
+static inline struct num *num_rol(struct num *a, struct num *b)
+{
+	return num_or(num_shl(a, b), num_shr(a,
+		num_sub(num_integer(INTEGER_BITS), b)));
+}
+
+static inline struct num *num_ror(struct num *a, struct num *b)
+{
+	return num_or(num_shr(a, b), num_shl(a,
+		num_sub(num_integer(INTEGER_BITS), b)));
+}
+
+static struct num *num_eq(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		num_set_integer(a, a->data.c == b->data.c);
+		break;
+	case T_INTEGER:
+		num_set_integer(a, a->data.i == b->data.i);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_ne(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		num_set_integer(a, a->data.c != b->data.c);
+		break;
+	case T_INTEGER:
+		num_set_integer(a, a->data.i != b->data.i);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_lt(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		num_set_integer(a, creal(a->data.c) < creal(b->data.c));
+		break;
+	case T_INTEGER:
+		num_set_integer(a, a->data.i < b->data.i);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_gt(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		num_set_integer(a, creal(a->data.c) > creal(b->data.c));
+		break;
+	case T_INTEGER:
+		num_set_integer(a, a->data.i > b->data.i);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_le(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		num_set_integer(a, creal(a->data.c) <= creal(b->data.c));
+		break;
+	case T_INTEGER:
+		num_set_integer(a, a->data.i <= b->data.i);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
+static struct num *num_ge(struct num *a, struct num *b)
+{
+	num_check(a, b);
+	switch (a->type) {
+	case T_COMPLEX:
+		num_set_integer(a, creal(a->data.c) >= creal(b->data.c));
+		break;
+	case T_INTEGER:
+		num_set_integer(a, a->data.i >= b->data.i);
+		break;
+	}
+	num_free(b);
+	return a;
+}
+
 %}
 
 stmt = WS i:expr EOF			{ $$ = i; }
 	| .				{ error_flag = 1; }
 expr = l:term0
-	( '&' WS r:term0		{ l &= r; }
-	| '|' WS r:term0		{ l |= r; }
-	| '^' WS r:term0		{ l ^= r; }
+	( '&' WS r:term0		{ l = num_and(l, r); }
+	| '|' WS r:term0		{ l = num_or(l, r); }
+	| '^' WS r:term0		{ l = num_xor(l, r); }
 	)*				{ $$ = l; }
 term0 = l:term1
-	( '<' WS r:term1		{ l = l < r; }
-	| '>' WS r:term1		{ l = l > r; }
-	| '>=' WS r:term1		{ l = l >= r; }
-	| '<=' WS r:term1		{ l = l <= r; }
-	| '==' WS r:term1		{ l = l == r; }
-	| '!=' WS r:term1		{ l = l != r; }
+	( '<' WS r:term1		{ l = num_lt(l, r); }
+	| '>' WS r:term1		{ l = num_gt(l, r); }
+	| '>=' WS r:term1		{ l = num_ge(l, r); }
+	| '<=' WS r:term1		{ l = num_le(l, r); }
+	| '==' WS r:term1		{ l = num_eq(l, r); }
+	| '!=' WS r:term1		{ l = num_ne(l, r); }
 	)*				{ $$ = l; }
 term1 = l:term2
-	( '<<' WS r:term2		{ l <<= r; }
-	| '>>' WS r:term2		{ l >>= r; }
-	| '>>>' WS r:term2		{ l = (l >> r) | (l << (YYSTYPE_BITS - r)); }
-	| '<<<' WS r:term2		{ l = (l << r) | (l >> (YYSTYPE_BITS - r)); }
+	( '<<' WS r:term2		{ l = num_shl(l, r); }
+	| '>>' WS r:term2		{ l = num_shr(l, r); }
+	| '>>>' WS r:term2		{ l = num_ror(l, r); }
+	| '<<<' WS r:term2		{ l = num_rol(l, r); }
 	)*				{ $$ = l; }
 term2 = l:term3
-	( '+' WS r:term3		{ l += r; }
-	| '-' WS r:term3		{ l -= r; }
+	( '+' WS r:term3		{ l = num_add(l, r); }
+	| '-' WS r:term3		{ l = num_sub(l, r); }
 	)*				{ $$ = l; }
 term3 = l:term4
-	( '*' WS r:term4		{ l *= r; }
-	| '/' WS r:term4		{ if (r) l /= r; else error_flag = 1; }
-	| '%' WS r:term4		{ if (r) l /= r; else error_flag = 1; }
+	( '*' WS r:term4		{ l = num_mul(l, r); }
+	| '/' WS r:term4		{ l = num_div(l, r); }
+	| '%' WS r:term4		{ l = num_mod(l, r); }
 	)*				{ $$ = l; }
 term4 = l:term5
-	( '**' WS r:term4               { l = ipow(l, r); }
+	( '**' WS r:term4               { l = num_pow(l, r); }
 	)*                              { $$ = l; }
 term5 = l:factor			{ $$ = l; }
-	| '~' WS l:factor		{ $$ = ~l; }
+	| '~' WS l:factor		{ $$ = num_not(l); }
 factor = ( i:NUM
 	| '(' WS i:expr ')' WS
 	)				{ $$ = i; }
 
 NUM =
-	( '0x' < [0-9a-fA-F]+ > WS		{ $$ = strtoll(yytext, 0, 16); }
-	| '0b' < [0-9a-fA-F]+ > WS		{ $$ = strtoll(yytext, 0, 2); }
-	| '0' < [0-9a-fA-F]+ > WS		{ $$ = strtoll(yytext, 0, 8); }
-	| < ('+' | '-')? [0-9]+ > WS		{ $$ = atoll(yytext); }
+	( '0x' < [0-9a-fA-F]+ > WS		{ $$ = num_integer(strtoll(yytext, 0, 16)); }
+	| '0b' < [0-9a-fA-F]+ > WS		{ $$ = num_integer(strtoll(yytext, 0, 2)); }
+	| '0' < [0-9a-fA-F]+ > WS		{ $$ = num_integer(strtoll(yytext, 0, 8)); }
+	| 'i' WS				{ $$ = num_complex(I); }
+	| < ('+' | '-')? [0-9]* '.' [0-9]+ ( [eE] ('+' | '-')? [0-9]+ )? > WS
+		{ $$ = num_complex(atof(yytext)); }
+	| < ('+' | '-')? [0-9]+ '.' [0-9]* ( [eE] ('+' | '-')? [0-9]+ )? > WS
+		{ $$ = num_complex(atof(yytext)); }
+	| < ('+' | '-')? [0-9]+ > WS		{ $$ = num_integer(atoll(yytext)); }
 	)
 WS = [ \t\r\n]*
 EOF = !.
 
 %%
-int xcalc(const char *s, YYSTYPE *v)
+struct num *xcalc(const char *s)
 {
 	error_flag = 0;
 	instr = s;
 	while (yyparse()) ;
-	*v = yy;
-	return error_flag;
+	if (error_flag) {
+		num_free(yy);
+		return NULL;
+	}
+	return yy;
 }

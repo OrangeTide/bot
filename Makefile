@@ -39,6 +39,6 @@ $1$E : $$(OBJS_$1)
 endef
 build-exe = $(eval $(call gen,$1,$2,$3))
 #
-$(call build-exe,bot,net.c bot.c ini.c xcalc.c, $(LDLIBS_net))
-$(call build-exe,calc,calcmain.c xcalc.c)
+$(call build-exe,bot,net.c bot.c ini.c xcalc.c, $(LDLIBS_net) -lm)
+$(call build-exe,calc,calcmain.c xcalc.c, -lm)
 xcalc.o : CFLAGS += -Wno-unused
