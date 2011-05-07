@@ -62,7 +62,7 @@ static int bot_option(const char *name, const char *value)
 		{ "realname", "%127s", &opt.realname },
 		{ "nick", "%31s", &opt.nick },
 		{ "autojoin", "%255s", &opt.autojoin },
-		{ "quitmessage", "%255s", &opt.quitmessage },
+		{ "quitmessage", "%255[^\n]", &opt.quitmessage },
 		{ "commandprefix", "%63s", &opt.commandprefix },
 		{ "verbose", "%d", &opt.verbose },
 	};
