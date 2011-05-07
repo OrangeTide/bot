@@ -1285,6 +1285,7 @@ struct num *xcalc(const char *s)
 {
 	error_flag = 0;
 	instr = s;
+	yy = NULL;
 	while (yyparse()) ;
 	if (error_flag) {
 		num_free(yy);
