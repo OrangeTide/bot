@@ -1,4 +1,5 @@
 %{
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -474,15 +475,25 @@ factor = ( i:NUM
 	)				{ $$ = i; }
 
 NUM =
-	( '0x' < [0-9a-fA-F]+ > WS		{ $$ = num_integer(strtoll(yytext, 0, 16)); }
-	| '0b' < [0-9a-fA-F]+ > WS		{ $$ = num_integer(strtoll(yytext, 0, 2)); }
-	| '0' < [0-9a-fA-F]+ > WS		{ $$ = num_integer(strtoll(yytext, 0, 8)); }
+	( < ('+' | '-')? '0x'? [0-9]+ [eEpP] ('+' | '-')? [0-9]+ > WS {
+		$$ = num_complex(atof(yytext)); }
+	| < ('+' | '-')? '0x'? ( [0-9]* '.' [0-9]+ | [0-9]+ '.' [0-9]* ) ( [eEpP] ('+' | '-')? [0-9]+ )? > WS {
+		$$ = num_complex(atof(yytext)); }
+	| < '0x' [0-9a-fA-F]+ > WS		{
+		long long t = strtoll(yytext, 0, 16);
+		if ((t == LLONG_MAX || t == LLONG_MIN) && errno == ERANGE)
+			$$ = num_complex(atof(yytext));
+		else
+			$$ = num_integer(t); }
+	| '0b' < [01]+ > WS	{ $$ = num_integer(strtoll(yytext, 0, 2)); }
+	| '0' < [0-7]+ > WS	{ $$ = num_integer(strtoll(yytext, 0, 8)); }
 	| 'i' WS				{ $$ = num_complex(I); }
-	| < ('+' | '-')? [0-9]* '.' [0-9]+ ( [eE] ('+' | '-')? [0-9]+ )? > WS
-		{ $$ = num_complex(atof(yytext)); }
-	| < ('+' | '-')? [0-9]+ '.' [0-9]* ( [eE] ('+' | '-')? [0-9]+ )? > WS
-		{ $$ = num_complex(atof(yytext)); }
-	| < ('+' | '-')? [0-9]+ > WS		{ $$ = num_integer(atoll(yytext)); }
+	| < ('+' | '-')? [0-9]+ > WS		{
+		long long t = strtoll(yytext, 0, 10);
+		if ((t == LLONG_MAX || t == LLONG_MIN) && errno == ERANGE)
+			$$ = num_complex(atof(yytext));
+		else
+			$$ = num_integer(t); }
 	)
 WS = [ \t\r\n]*
 EOF = !.
