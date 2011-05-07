@@ -222,12 +222,16 @@ static struct num *num_mul(struct num *a, struct num *b)
 static struct num *num_div(struct num *a, struct num *b)
 {
 	num_check(a, b);
+	if (a->type == T_INTEGER && b->data.i == -1 && a->data.i == LLONG_MIN) {
+		num_make_complex(a);
+		num_make_complex(b);
+	}
 	switch (a->type) {
 	case T_COMPLEX:
 		a->data.c /= b->data.c;
 		break;
 	case T_INTEGER:
-		if (b->data.c)
+		if (b->data.i)
 			a->data.i /= b->data.i;
 		else
 			num_set_complex(a, NAN);
@@ -240,12 +244,16 @@ static struct num *num_div(struct num *a, struct num *b)
 static struct num *num_mod(struct num *a, struct num *b)
 {
 	num_check(a, b);
+	if (a->type == T_INTEGER && b->data.i == -1 && a->data.i == LLONG_MIN) {
+		num_make_complex(a);
+		num_make_complex(b);
+	}
 	switch (a->type) {
 	case T_COMPLEX:
 		a->data.c = fmod(creal(a->data.c), creal(b->data.c));
 		break;
 	case T_INTEGER:
-		if (b->data.c)
+		if (b->data.i)
 			a->data.i /= b->data.i;
 		else
 			num_set_complex(a, NAN);
