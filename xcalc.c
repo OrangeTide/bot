@@ -1280,7 +1280,7 @@ struct num *xcalc(const char *s)
 	while (yyparse()) ;
 	if (error_flag) {
 		num_free(yy);
-		return NULL;
+		yy = NULL;
 	}
 	return yy;
 }
