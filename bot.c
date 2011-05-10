@@ -59,7 +59,7 @@ static int bot_option(const char *name, const char *value)
 	} options[] = {
 		{ "host", "%63s", &opt.host },
 		{ "port", "%d", &opt.port },
-		{ "realname", "%127s", &opt.realname },
+		{ "realname", "%127[^\n]", &opt.realname },
 		{ "nick", "%31s", &opt.nick },
 		{ "autojoin", "%255s", &opt.autojoin },
 		{ "quitmessage", "%255[^\n]", &opt.quitmessage },
