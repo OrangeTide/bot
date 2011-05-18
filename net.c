@@ -37,6 +37,9 @@ static int socket_connect_by_addr(int *fd, int socktype,
 		print_socket_error();
 		return e;
 	}
+	e = fcntl(*fd, F_SETFD, FD_CLOEXEC);
+	if (e)
+		goto close_fd;
 	/*
 	e = fcntl(*fd, F_SETFL, O_NONBLOCK);
 	if (e)

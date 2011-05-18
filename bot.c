@@ -49,6 +49,7 @@ static char inbuf[1024];
 static size_t inbuf_ofs;
 static size_t inbuf_max = sizeof(inbuf);
 static sig_atomic_t keep_going;
+static sig_atomic_t restart;
 static time_t start_time;
 
 static int bot_option(const char *name, const char *value)
@@ -255,6 +256,17 @@ static int on_user_quit(_unused int fd,
 	return 0;
 }
 
+static int on_user_restart(_unused int fd, const char *from,
+	_unused const char *to, _unused char *msg)
+{
+	const char *nick = get_nick(from); // WARNING: called twice
+
+	pr_info("restart requested by %s\n", nick);
+	keep_going = 0;
+	restart = 1;
+	return 0;
+}
+
 static int on_user_echo(int fd, const char *from, const char *to,
 	char *msg)
 {
@@ -306,7 +318,7 @@ static int on_user_help(int fd, _unused const char *from, const char *to,
 	_unused char *msg)
 {
 	return irc_notice(fd, to,
-		"HELP: quit, echo, calc, hexcalc, time, uptime, help");
+		"HELP: quit, restart, echo, calc, hexcalc, time, uptime, help");
 }
 
 static int on_user_time(int fd, _unused const char *from, const char *to,
@@ -381,6 +393,7 @@ static int dispatch_user_command(int fd, const char *from, const char *to,
 			char *msg);
 	} user_cmds[] = {
 		{ "quit", on_user_quit },
+		{ "restart", on_user_restart },
 		{ "echo", on_user_echo },
 		{ "calc", on_user_calc },
 		{ "hexcalc", on_user_hexcalc },
@@ -624,9 +637,11 @@ static void stop_going(_unused int s)
 	return;
 }
 
-int main()
+int main(_unused int argc, char **argv)
 {
 	int e;
+	int ret;
+
 	opt.port = 6667;
 	e = ini_load("bot.ini", bot_ini);
 	if (e) {
@@ -640,7 +655,16 @@ int main()
 	signal(SIGTERM, stop_going);
 	*/
 	signal(SIGINT, stop_going);
-	if (bot_start())
+	ret = bot_start();
+
+	if (!ret && restart) {
+		execv(argv[0], argv);
+		perror(argv[0]);
 		return 1;
+	}
+
+	if (ret)
+		return 1;
+
 	return 0;
 }
