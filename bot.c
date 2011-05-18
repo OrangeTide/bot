@@ -42,6 +42,7 @@ static struct {
 	char quitmessage[256];
 	char commandprefix[64];
 	int verbose;
+	char unknowncommand[128];
 } opt;
 
 static char inbuf[1024];
@@ -65,6 +66,7 @@ static int bot_option(const char *name, const char *value)
 		{ "quitmessage", "%255[^\n]", &opt.quitmessage },
 		{ "commandprefix", "%63s", &opt.commandprefix },
 		{ "verbose", "%d", &opt.verbose },
+		{ "unknowncommand", "%127[^\n]", &opt.unknowncommand },
 	};
 	unsigned i;
 	for (i = 0; i < ARRAY_SIZE(options); i++) {
@@ -347,6 +349,29 @@ static int on_user_uptime(int fd, _unused const char *from, const char *to,
 		return irc_notice(fd, to, "I've been awake for %u seconds.", sec);
 }
 
+static void unknowncommand(int fd, const char *to, const char *cmd)
+{
+	size_t cmd_len = strlen(cmd);
+	char buf[sizeof(opt.unknowncommand) + cmd_len];
+	const char *s = opt.unknowncommand;
+	unsigned i;
+
+	i = 0;
+	s = opt.unknowncommand;
+	while (*s && i < sizeof(buf) - 1) {
+		if (*s != '%') {
+			buf[i++] = *s++;
+		} else {
+			memcpy(buf + i, cmd, cmd_len);
+			i += cmd_len;
+			s++;
+		}
+	}
+	buf[i] = 0;
+
+	irc_notice(fd, to, "%s", buf);
+}
+
 static int dispatch_user_command(int fd, const char *from, const char *to,
 	const char *cmd, char *msg)
 {
@@ -376,7 +401,7 @@ static int dispatch_user_command(int fd, const char *from, const char *to,
 			return user_cmds[i].func(fd, from, to, msg);
 	}
 
-	irc_notice(fd, to, "unknown command '%s'", cmd);
+	unknowncommand(fd, to, cmd);
 
 	return 0;
 }
@@ -608,6 +633,8 @@ int main()
 		pr_err("%s:could not load\n", "bot.ini");
 		return 1;
 	}
+	if (!*opt.unknowncommand)
+		strcpy(opt.unknowncommand, "unknown command '%'");
 	keep_going = 1;
 	/*
 	signal(SIGTERM, stop_going);
