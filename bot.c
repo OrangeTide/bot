@@ -626,6 +626,8 @@ static int bot_start(void)
 
 	irc_quit(fd, !ret ? opt.quitmessage : "Fatal Error!");
 
+	sleep(5);
+
 	close(fd);
 	return ret;
 }
@@ -653,8 +655,8 @@ int main(_unused int argc, char **argv)
 	keep_going = 1;
 	/*
 	signal(SIGTERM, stop_going);
-	*/
 	signal(SIGINT, stop_going);
+	*/
 	ret = bot_start();
 
 	if (!ret && restart) {
