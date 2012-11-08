@@ -273,7 +273,7 @@ static int on_user_echo(int fd, const char *from, const char *to,
 	const char *nick = get_nick(from); // WARNING: called twice
 	if (!msg)
 		msg = "<nothing>";
-	return irc_privmsg(fd, to, "%s said '%s'", nick, msg);
+	return irc_notice(fd, to, "%s said '%s'", nick, msg);
 }
 
 static int on_user_calc(int fd, const char *from, const char *to,
@@ -592,9 +592,11 @@ static int bot_loop(int fd)
 {
 	while (keep_going) {
 		if (fill_buffer(fd)) {
+			pr_info("buffer I/O error\n");
 			return -1;
 		}
 		if (process_messages(fd)) {
+			pr_info("processing error\n");
 			return -1;
 		}
 	}

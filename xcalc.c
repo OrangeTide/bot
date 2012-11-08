@@ -261,7 +261,7 @@ static struct num *num_mod(struct num *a, struct num *b)
 		break;
 	case T_INTEGER:
 		if (b->data.i)
-			a->data.i /= b->data.i;
+			a->data.i %= b->data.i;
 		else
 			num_set_complex(a, NAN);
 		break;
