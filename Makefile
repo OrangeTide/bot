@@ -35,7 +35,7 @@ all : $1$E
 clean ::
 	$$(RM) $1$E $$(OBJS_$1)
 $1$E : $$(OBJS_$1)
-	$(call Q,LD $$@ ($$^),$$(CROSS_COMPILE)$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$(LDFLAGS) $3 -o $$@ $$(filter %.o %.a,$$^))
+	$(call Q,LD $$@ ($$^),$$(CROSS_COMPILE)$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$(LDFLAGS) -o $$@ $$(filter %.o %.a,$$^) $3)
 endef
 build-exe = $(eval $(call gen,$1,$2,$3))
 #
