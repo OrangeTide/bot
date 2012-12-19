@@ -1,0 +1,10 @@
+TODO:
+- "stats" command with an interface for many plugins to register stats
+- default command for PRIVMSG, can be changed by some commands
+- z-machine
+- list z-machine files with SHA
+- DCC support to send z-machine save files
+- ini file: multiple network support [network:FreeNode] ...
+
+DONE:
+- ini file: unknowncommand
